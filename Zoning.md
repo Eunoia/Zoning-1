@@ -1,0 +1,325 @@
+SB 827 in NYC
+================
+Sean Connelly
+March 07, 2018
+
+In 2018, one would be forgiven for assuming that California politicians denouncing legislation as the ["lovechild of Vladimir Putin and the Koch Bros."](https://twitter.com/JohnMirisch/status/959344970581848064) or as a ["declaration of war against our neighborhoods"](http://www.berkeleyside.com/2018/01/22/berkeley-mayor-wiener-skinner-housing-bill-declaration-war-neighborhoods/) were referring to the latest proposals from the Trump administration. These criticisms were not leveled at Washington, but rather a much more unlikely target - a Democrat from San Francisco. What exactly did Scott Wiener, the state senator in question, do to stir up such opposition? He submitted a housing bill. More specifically, he put forward a *zoning* bill.
+
+Wiener introduced [State Bill 827](https://leginfo.legislature.ca.gov/faces/billTextClient.xhtml?bill_id=201720180SB827) (SB 827) in the California legislature on January 3, 2018. Plenty of articles explaining the particulars of SB 827 have already been written: here are [Slate](https://slate.com/business/2018/01/california-bill-sb827-residential-zoning-transit-awesome.html), [Wired](https://www.wired.com/story/scott-weiner-california-housing-bill-cities/), and the [Boston Globe's](https://www.bostonglobe.com/opinion/2018/01/14/california-blow-your-lousy-zoning-laws/AcT0vOJCdArOJp3cBH9zmJ/story.html), to name a few. In short, the bill would exempt new construction within a half-mile of a high-frequency transit stop or a quarter-mile of a high-frequency bus corridor (i.e. service every 15 minutes during rush hour) from residential density, parking, and architectural design restrictions. SB 827 would also raise the maximum building height limit to 45, 55, or 85 feet depending on how close the project is to transit and how wide the street is. To be clear, real estate companies would not be mandated to build anything; the law would just prevent local ordinances from killing economically viable housing developments.
+
+The scale and scope of SB 827 can be difficult to comprehend when reading over the text of the bill, especially if one is unfamiliar with zoning laws, or finds them hard to decipher (a group that includes, well, just about everybody). Several planners, data analysts, and coders have visualized how SB 827 would affect their cities. The incredible work done by the folks at [Policy Club](https://policyclub.io/sb-827) and [Sasha Aickin](https://transitrichhousing.org/) for Los Angeles and the Bay Area, respectively, made me wonder: what would New York City look like under this legislation?
+
+Forget, for a moment, about the chance of such a bill realistically passing in Albany; why is New York a worthwhile case study? First and foremost, self-interest. The hope that, one day, I might not have to pay an eye-watering amount of my paycheck in rent is the only thing that keeps me sane. Beyond NYC and California's shared housing crisis, though, the city has a unique and complex history with density and zoning.
+
+New York has long been reputed - sometimes incorrectly - as the trend-setting American metropolis, but in the case of zoning its pioneer status is well deserved. New York City passed the [first zoning code](https://www1.nyc.gov/site/planning/zoning/background.page) in the United States in 1916 in direct response to inhumane, unhealthy tenements and air flow restricting, shadow casting skyscrapers. While the 1916 code reined in the excesses of private development, it would be disingenuous to characterize it as overly restrictive. NYC theoretically could have reached a population of 55 million if the original laws had remained in effect. Instead, the city passed the current zoning code in 1961, a car-centric tear-down of the 1916 ordinance that introduced parking minimums and reined in density; even the New York City Department of City Planning damningly excuses the resolution as ["a product of its time"](https://www1.nyc.gov/site/planning/about/city-planning-history.page?tab=2). The result is a city at odds with itself, one that encompasses some of the highest density neighborhoods in the country (Washington Heights, Upper East Side), but also a place where [40 percent of Manhattan's buildings](https://www.nytimes.com/interactive/2016/05/19/upshot/forty-percent-of-manhattans-buildings-could-not-be-built-today.html) violate the current zoning code and where the average household would have to spend more than [60 percent of their income](https://streeteasy.com/blog/new-york-city-rent-affordability-2016/) to meet the median market rent.
+
+The best way to visualize SB 827's hypothetical impact on New York City is with maps. Before projecting any changes, however, it might be helpful to have some idea of the situation as it stands. Here are the city's current zoning districts and subway routes and stops, easily recreated thanks to the great [ZoLa tool](https://zola.planning.nyc.gov/data#10.72/40.7226/-73.8706) rolled out by NYC Planning Labs. I added the Metropolitan Transit Authority's (MTA) express bus routes in gray. If you would like to see how the raw data was pulled in, please check out the rmarkdown in this repository.
+
+``` r
+#Remove boundaries between districts for broad overview
+map_clean <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = -73.9951,lat = 40.7236,zoom = 11) %>%  
+  addPolygons(data = zoning_nyc,stroke = F,fill = T,
+              fillColor = ~zone_color,fillOpacity = .5,
+              popup = paste0(zoning_nyc$rde)) %>% 
+  addPolylines(data = sub_routes,stroke = T,weight = 3,color = ~route_color) %>%
+  addPolylines(data = bus_routes,stroke = T,weight = 2,color = "#808080") %>%
+  addCircles(data = sub_stops,stroke = T,weight = 1,color = "#0F0F0F",
+             radius = 50,fillOpacity = 1,fillColor = "#FFFFFF") %>% 
+  addLegend(colors = zoning_pal$zone_color,labels = zoning_pal$zone_legend)
+
+map_clean
+```
+
+<img src="Zoning_files/figure-markdown_github/unnamed-chunk-1-1.png" style="display: block; margin: auto;" />
+
+The city is broken up into three types of district: manufacturing (approximately no new residential housing allowed), commercial (mostly mixed use buildings), and residential (strictly residential housing). In general, most of New York's waterfront is zoned as manufacturing, Midtown, Wall Street, and arterial streets as commercial, and the remaining land as residential. Within each district type, however, there are lower and higher-density areas. For example, residential districts range from single-family R1s to high rise R10s. Here is what the zoning map looks like with each unique area outlined:
+
+``` r
+#Specific district outlines
+map_border <- leaflet() %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = -73.9951,lat = 40.7236,zoom = 11) %>% 
+  addPolygons(data = zoning_nyc,stroke = T,weight = 1,color = "#0F0F0F",
+              fill = T,fillColor = ~zone_color,fillOpacity = .5) %>% 
+  addPolylines(data = sub_routes,stroke = T,weight = 3,color = ~route_color) %>%
+  addPolylines(data = bus_routes,stroke = T,weight = 2,color = "#808080") %>%
+  addCircles(data = sub_stops,stroke = T,weight = 1,color = "#0F0F0F",
+             radius = 50,fillOpacity = 1,fillColor = "#FFFFFF")
+  
+map_border
+```
+
+<img src="Zoning_files/figure-markdown_github/unnamed-chunk-2-1.png" style="display: block; margin: auto;" />
+
+A tad more complicated. Thankfully, SB 827 doesn't really care if a certain block is designated R2 or R3. Any parcel zoned for residential housing that falls within the specified radius of a high-frequency subway stop or bus corridor is exempted from density and parking requirements. I identified these stops and routes using the static General Transit Feed Specification (GTFS) for each service.
+
+``` r
+#=============
+#Subway
+#=============
+
+# set the API key
+# set_api_key() # uncomment to set api key
+
+#Grab NYC subway GTFS feed URL
+feedlist_sub <- get_feedlist() %>%
+  filter(grepl("NYC Subway GTFS",t,ignore.case = T))
+
+#Import GTFS
+gtfs_sub_nyc <- import_gtfs(feedlist_sub$url_d)
+```
+
+    ## [1] "agency.txt"         "calendar.txt"       "calendar_dates.txt"
+    ## [4] "routes.txt"         "shapes.txt"         "stop_times.txt"    
+    ## [7] "stops.txt"          "transfers.txt"      "trips.txt"
+
+``` r
+#Get weekday AM/PM rush hour train count by station 
+gtfs_sub_freq <- inner_join(gtfs_sub_nyc[["stop_times_df"]],gtfs_sub_nyc[["stops_df"]],
+                            by = c("stop_id")) %>%
+  inner_join(gtfs_sub_nyc[["trips_df"]],by = c("trip_id")) %>%
+  inner_join(gtfs_sub_nyc[["calendar_df"]],by = c("service_id")) %>%
+  mutate(rush_hour = case_when((arrival_time>="06:30:00" & arrival_time<="09:30:00")|
+                               (departure_time>="06:30:00" & departure_time<="09:30:00") ~ "AM",
+                               (arrival_time>="15:30:00" & arrival_time<="20:00:00")|
+                               (departure_time>="15:30:00" & departure_time<="20:00:00") ~ "PM",
+                               TRUE ~ NA_character_)) %>%
+  filter(rush_hour %in% c("AM","PM") &
+        (monday==1|tuesday==1|wednesday==1|thursday==1|friday==1)) %>% 
+  select(stop_id,stop_name,rush_hour,stop_lat,stop_lon) %>%
+  group_by(stop_id,stop_name,rush_hour,stop_lat,stop_lon) %>%
+  summarize(count = n()) %>%
+  ungroup() %>% 
+  spread(rush_hour,count,fill = 0) %>% 
+  mutate(AM_per_hour = AM/3,PM_per_hour = PM/4.5)
+  
+#Only look at those that average 4 per hour/15 minute frequency
+high_freq_sub_stops <- gtfs_sub_freq %>%
+  filter(AM_per_hour>=4 & PM_per_hour>=4) %>%
+  select(stop_name,stop_lat,stop_lon) %>% 
+  distinct() %>% 
+  st_as_sf(.,coords = c("stop_lon", "stop_lat"),crs = 4326,agr = "constant")
+
+rm(feedlist_sub,gtfs_sub_nyc)
+
+#=============
+#Bus
+#=============
+
+#Grab NYC bus GTFS feed URL
+feedlist_bus <- get_feedlist() %>%
+  filter(grepl("NYC Bus Company GTFS",t,ignore.case = T))
+
+#Import GTFS
+gtfs_bus_nyc <- import_gtfs(feedlist_bus$url_d)
+```
+
+    ## [1] "agency.txt"         "calendar.txt"       "calendar_dates.txt"
+    ## [4] "routes.txt"         "shapes.txt"         "stop_times.txt"    
+    ## [7] "stops.txt"          "trips.txt"
+
+``` r
+#Get weekday AM/PM rush hour train count by station 
+gtfs_bus_freq <- inner_join(gtfs_bus_nyc[["stop_times_df"]],gtfs_bus_nyc[["stops_df"]],
+                            by = c("stop_id")) %>%
+  inner_join(gtfs_bus_nyc[["trips_df"]],by = c("trip_id")) %>%
+  inner_join(gtfs_bus_nyc[["routes_df"]],by = c("route_id")) %>%
+  inner_join(gtfs_bus_nyc[["calendar_df"]],by = c("service_id")) %>%
+  mutate(rush_hour = case_when((arrival_time>="06:30:00" & arrival_time<="09:30:00")|
+                               (departure_time>="06:30:00" & departure_time<="09:30:00") ~ "AM",
+                               (arrival_time>="15:30:00" & arrival_time<="20:00:00")|
+                               (departure_time>="15:30:00" & departure_time<="20:00:00") ~ "PM",
+                               TRUE ~ NA_character_)) %>%
+  filter(rush_hour %in% c("AM","PM") &
+        (monday==1|tuesday==1|wednesday==1|thursday==1|friday==1)) %>% 
+  select(stop_id,route_id,stop_name,rush_hour,stop_lat,stop_lon) %>%
+  group_by(stop_id,route_id,stop_name,rush_hour,stop_lat,stop_lon) %>%
+  summarize(count = n()) %>%
+  ungroup() %>% 
+  spread(rush_hour,count,fill = 0) %>% 
+  mutate(AM_per_hour = AM/3,PM_per_hour = PM/4.5)
+  
+#Only look at routes with at least 2 stops (start/end?) that average 4 per hour/15 minute frequency
+high_freq_bus_routes <- gtfs_bus_freq %>%
+  filter(AM_per_hour>=4 & PM_per_hour>=4) %>%
+  select(route_id,stop_name,stop_lat,stop_lon) %>%
+  group_by(route_id) %>% 
+  summarize(count = n()) %>% 
+  filter(count>=2) %>% 
+  semi_join(bus_routes,.,by = c("route_id"))
+
+rm(feedlist_bus,gtfs_bus_nyc)
+```
+
+As a reminder, projects within a block of a qualified subway stop or a quarter-mile of the bus route must have a maximum height limit of at least 55 feet (depending on street width). Developments located outside of this region but that are less than a half-mile away from a major transit stop must have a height limit of at least 45 feet. Based on the [city zoning tables](https://www1.nyc.gov/assets/planning/download/pdf/zoning/districts-tools/zoning_data_tables.pdf), districts equivalent to R5 and below are impacted under either scenario. The only areas that would solely violate the 55 foot threshold are those zoned R6B.
+
+``` r
+#=============
+#Residential District Equivalent (RDE) for Commerical Districts
+#=============
+
+#Grab PDF with RDEs
+#1st column
+rde_pdf_1 <- extract_tables("https://www1.nyc.gov/assets/planning/download/pdf/zoning/districts-tools/zoning_data_tables.pdf",pages = 6,guess = F,
+                       area = list(c(94.86,68.39,748.94,298.65)),
+                       method = "data.frame") %>%
+  .[[1]] %>% 
+  select(1,4) %>% 
+  rename(zonedist = "X",rde = "Residential") %>% 
+  mutate(zonedist = word(gsub(".*C","C",zonedist),1,1),
+         rde = ifelse(grepl("R",rde)==T,rde,NA_character_)) %>%
+  filter(!is.na(rde))
+
+#2nd column
+rde_pdf_2 <- extract_tables("https://www1.nyc.gov/assets/planning/download/pdf/zoning/districts-tools/zoning_data_tables.pdf",pages = 6,guess = F,
+                       area = list(c(93.33,314.72,598.23,546.52)),
+                       method = "data.frame") %>%
+  .[[1]] %>% 
+  select(1,5) %>% 
+  rename(zonedist = "X",rde = "Residential") %>% 
+  mutate(rde = ifelse(grepl("R",rde)==T,rde,NA_character_)) %>%
+  filter(!is.na(rde))
+
+#Combine into one data frame
+rde_pdf <- bind_rows(rde_pdf_1,rde_pdf_2) %>% as_tibble()
+rm(rde_pdf_1,rde_pdf_2)  
+
+#Pull into citywide zoning
+zoning_nyc <- zoning_nyc %>%
+  left_join(.,rde_pdf,by = "zonedist") %>% 
+  select(zonedist,rde,everything()) %>%
+  mutate(rde = case_when(str_sub(zonedist,1,1)=="R" ~zonedist,
+                         zonedist %in% c("C5-2.5","C6-4.5") ~ "R10",
+                         TRUE ~ rde),
+         rde_short = case_when(str_sub(rde,1,3)=="R10" ~ "R10",
+                               rde=="R6B" ~ rde,
+                               TRUE ~ str_sub(rde,1,2)))
+```
+
+Armed with all of this data, I was able to construct a map that highlights the areas that would be affected by SB 827. The legend lists cumulative impacts. Orange colored sections mark where developments would be exempt from parking and density restrictions. Places colored blue would, in addition, have to raise the maximum building height limit to at least 45 feet. Green is nearly identical to blue, but the height limit would have to be at least 55 feet.
+
+``` r
+#=============
+#Clean Zoning Polygons
+#=============
+
+#Only valid geometries
+zoning_nyc <- zoning_nyc %>%
+  filter(!is.na(st_is_valid(.))) %>%
+  st_buffer(dist = 0)
+
+#Allow residential housing
+zoning_nyc_resid <- zoning_nyc %>%
+  filter(!is.na(rde)) %>%
+  st_union(.)
+
+#45-foot eligible zones
+zoning_nyc_45 <- zoning_nyc %>%
+  filter(rde_short %in% c("R1","R2","R3","R4","R5")) %>%
+  st_union(.)
+
+#55-foot eligible zones
+zoning_nyc_55 <- zoning_nyc %>%
+  filter(rde_short %in% c("R1","R2","R3","R4","R5","R6B")) %>%
+  st_union(.)
+
+#=============
+#Density, Parking Generally
+#=============
+
+#Anything within 1/2 mile of major transit stop or 1/4 mile of high frequency bus
+#is exempt from density and parking requirements
+dense_park_sub <- high_freq_sub_stops %>%
+  st_transform(crs = 32618) %>%
+  st_buffer(dist = 800) %>% #~1/2 mile
+  st_transform(crs = 4326) %>%
+  st_union(.) %>%
+  st_intersection(.,zoning_nyc_resid)
+
+dense_park_bus <- high_freq_bus_routes %>%
+  st_transform(crs = 32618) %>%
+  st_buffer(dist = 400) %>% #~1/4 mile
+  st_transform(crs = 4326) %>%
+  st_union(.) %>%
+  st_intersection(.,zoning_nyc_resid)
+
+dense_park <- st_union(dense_park_sub,dense_park_bus)
+
+rm(dense_park_sub,dense_park_bus)
+
+#=============
+#Density, Parking, and minimum 45 foot height limit (varies on street width)
+#=============
+
+#Within 1/2 mile of major transit stop and
+#in an (R1-R5) district with max height limits that are too low
+dense_park_45 <- high_freq_sub_stops %>%
+  st_transform(crs = 32618) %>%
+  st_buffer(dist = 800) %>% #~1/2 mile
+  st_transform(crs = 4326) %>%
+  st_union(.) %>%
+  st_intersection(.,zoning_nyc_45)
+
+#=============
+#Density, Parking, and minimum 55 foot height limit (varies on street width)
+#=============
+
+#Within a block of major transit stop or 1/4 mile of high frequency bus and
+#in an (R1-R5, R6B) district with max height limits that are too low
+dense_park_55_sub <- high_freq_sub_stops %>%
+  st_transform(crs = 32618) %>%
+  st_buffer(dist = 215) %>% #~1 block, 700 feet (215 M) for sake of consistency w/ @xander76
+  st_transform(crs = 4326) %>%
+  st_union(.) %>%
+  st_intersection(.,zoning_nyc_55)
+
+dense_park_55_bus <- high_freq_bus_routes %>%
+  st_transform(crs = 32618) %>%
+  st_buffer(dist = 400) %>% #~1/4 mile
+  st_transform(crs = 4326) %>%
+  st_union(.) %>%
+  st_intersection(.,zoning_nyc_55)
+
+dense_park_55 <- st_union(dense_park_55_sub,dense_park_55_bus)
+
+rm(dense_park_55_sub,dense_park_55_bus)
+```
+
+``` r
+#Legend for map
+sb_827_pal <- tibble(legend = c("Exempt from<br>Density and Parking",
+                                "+ Height Limit of 45'<br>(55' on wide streets)",
+                                "+ Height Limit of 55'<br>(85' on wide streets)"),
+                     color = c("#F37735","#40E0D0","#008000")) %>% 
+  mutate(legend = as_factor(legend) %>% 
+           fct_relevel("Exempt from<br>Density and Parking",
+                       "+ Height Limit of 45'<br>(55' on wide streets)",
+                       "+ Height Limit of 55'<br>(85' on wide streets)"))
+
+#Impacted areas
+map_sb_827 <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = -73.9951,lat = 40.7236,zoom = 11) %>%
+  #Density and parking only
+  addPolygons(data = dense_park,stroke = F,fill = T,
+              fillColor = "#F37735",fillOpacity = 1) %>%
+  #And max building height at least 45 feet
+  addPolygons(data = dense_park_45,stroke = F,fill = T,
+              fillColor = "#40E0D0",fillOpacity = 1) %>%
+  #And max building height at least 55 feet
+  addPolygons(data = dense_park_55,stroke = F,fill = T,
+              fillColor = "#008000",fillOpacity = 1) %>% 
+  addLegend(colors = sb_827_pal$color,labels = sb_827_pal$legend)
+            
+map_sb_827
+```
+
+<img src="Zoning_files/figure-markdown_github/unnamed-chunk-3-1.png" style="display: block; margin: auto;" />
+
+The entirety of Manhattan, more or less, would no longer have minimum parking rules or density-restricting floor area ratios. All of the island's zoning districts that allow for residential housing, however, already exceed the 45 or 55 foot height ceilings outlined in the bill. Significant portions of the Bronx, downtown Brooklyn, Park Slope, and Prospect Heights would be in a similar position. Several blocks located around subway stops on arterial streets like Atlantic Avenue and 4th Avenue would be upzoned. The most dramatically impacted neighborhoods, by far, would be those with relatively low-density zoning farther away from Manhattan, but still have access to high-frequency transit that provides access to the central business district: Bensonhurst, Midwood, Ozone Park, and Elmhurst.
+
+Many people are wary of the impact SB 827 will have on communities that are eligible for upzoning. While the bill specifically leaves inclusionary zoning requirements and other local laws aimed to prevent displacement intact, housing advocates still feel that current tenants are not provided enough protection. Senator Wiener, however, has recently proposed [amendments](https://medium.com/@Scott_Wiener/sb-827-amendments-strengthening-demolition-displacement-protections-4ced4c942ac9) aimed at allaying these concerns, including deferring to local demolition controls and providing right of first refusal for existing renters. I would agree that these are sensible protections worth incorporating into the legislation, but a New York version of SB 827 would have to confront the disparity between Manhattan and the outer boroughs. New York City desperately needs more housing units, and that load must be equitably shared across the counties, if only to ensure broad political support. Just because Greenwich Village happens to barely pass the 55 foot maximum height limit as an R6 zone does not mean it should be spared from all development while East New York undergoes a dramatic transformation.
+
+Finally, this map is far from the finished product. The bill is sure to be amended more than it already has. I had to make some decisions along the way based on my own amateur legal interpretation (express or local bus routes? best way to identify high-frequency transit? how far is a block? etc.) and some of those are sure to be wrong on its face or clarified in later versions of SB 827. Regardless, this piece of legislation proposes the exact kind of bold, drastic action that states and cities need to start addressing the housing and climate crises.
